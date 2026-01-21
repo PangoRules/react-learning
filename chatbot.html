@@ -12,29 +12,51 @@
 
     <script src="https://unpkg.com/supersimpledev/babel.js"></script>
     <script type="text/babel">
-      function ChatInput({ chatMessages, setChatMessages }) {
+      function ChatInput({
+        chatMessages,
+        setChatMessages,
+        isLoading,
+        setIsLoading,
+      }) {
         const [inputText, setInputText] = React.useState('')
+
+        const trimmed = inputText.trim()
+        const canSend = !isLoading && trimmed.length > 0
 
         function saveInputText(event) {
           setInputText(event.target.value)
         }
 
-        function sendMessage() {
+        async function sendMessage() {
+          if (!canSend) return
+          setIsLoading(true)
+
           const newChatMessages = [
             ...chatMessages,
             { message: inputText, sender: 'user', id: crypto.randomUUID() },
           ]
 
           setChatMessages(newChatMessages)
-
-          const response = Chatbot.getResponse(inputText)
-
-          setChatMessages([
-            ...newChatMessages,
-            { message: response, sender: 'robot', id: crypto.randomUUID() },
-          ])
-
           setInputText('')
+          try {
+            const response = await Chatbot.getResponseAsync(inputText)
+
+            setChatMessages([
+              ...newChatMessages,
+              { message: response, sender: 'robot', id: crypto.randomUUID() },
+            ])
+          } finally {
+            setIsLoading(false)
+          }
+        }
+
+        function keyPressedListener({ key }) {
+          if (key === 'Enter') {
+            sendMessage()
+          }
+          if (key === 'Esc' || key === 'Escape') {
+            setInputText('')
+          }
         }
 
         return (
@@ -44,6 +66,8 @@
               size="30"
               onChange={saveInputText}
               value={inputText}
+              onKeyDown={keyPressedListener}
+              disabled={isLoading}
             />
             <button onClick={sendMessage}>Send</button>
           </>
@@ -70,7 +94,7 @@
         )
       }
 
-      function ChatMessages({ chatMessages }) {
+      function ChatMessages({ chatMessages, isLoading }) {
         return (
           <>
             {chatMessages.map((msg) => {
@@ -82,6 +106,9 @@
                 />
               )
             })}
+            {isLoading && (
+              <ChatMessage message="Loading..." sender="robot" key="loading" />
+            )}
           </>
         )
       }
@@ -110,13 +137,17 @@
           },
         ])
 
+        const [isLoading, setIsLoading] = React.useState(false)
+
         return (
           <>
             <ChatInput
               chatMessages={chatMessages}
               setChatMessages={setChatMessages}
+              isLoading={isLoading}
+              setIsLoading={setIsLoading}
             />
-            <ChatMessages chatMessages={chatMessages} />
+            <ChatMessages chatMessages={chatMessages} isLoading={isLoading} />
           </>
         )
       }
